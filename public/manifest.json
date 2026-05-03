@@ -1,7 +1,7 @@
 {
-  "name": "Liga de Damas · Padel Box",
-  "short_name": "Padel Box",
-  "description": "Tabla de posiciones y resultados de la Liga de Damas Padel Box",
+  "name": "LI.DA.BOX · Liga de Damas",
+  "short_name": "LI.DA.BOX",
+  "description": "Tabla de posiciones y resultados de la Liga de Damas LI.DA.BOX",
   "start_url": ".",
   "display": "standalone",
   "orientation": "portrait",
