@@ -483,6 +483,9 @@ export default function App() {
       </div>
     </div>
   );
+
+  // ── PIN MODAL ADMIN ───────────────────────────────────────
+  if(showPinModal) return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:24}}>
       <div style={{background:"linear-gradient(135deg,#1e0640,#3d1260)",border:"1px solid rgba(232,79,160,0.4)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:340,textAlign:"center"}}>
         <div style={{fontSize:32,marginBottom:12}}>⚙️</div>
