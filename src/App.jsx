@@ -3,6 +3,7 @@ import {
   fetchTabla, fetchFixture, fetchInscriptas, fetchEtapaInfo,
   fetchFechaData, fetchInscConfig, fetchPagos, fetchFoto, subirFoto,
   inscribirse, desinscribir, adminLogin, updatePago, setInscConfig,
+  loginJugadora, cambiarPin,
 } from "./api.js";
 
 // ── Utilidades ───────────────────────────────────────────────
@@ -91,6 +92,14 @@ export default function App() {
   const [myName,       setMyName]     = useState(()=>localStorage.getItem("lidabox_nombre")||"");
   const [showLogin,    setShowLogin]  = useState(!localStorage.getItem("lidabox_nombre"));
   const [loginInput,   setLoginInput] = useState("");
+  const [pinLoginInput,setPinLogin]   = useState("");
+  const [loginError,   setLoginError] = useState("");
+  const [loginLoading, setLoginLoad]  = useState(false);
+  const [showCambiarPin,setShowCambiarPin] = useState(false);
+  const [pinActual,    setPinActual]  = useState("");
+  const [pinNuevo,     setPinNuevo]   = useState("");
+  const [pinNuevo2,    setPinNuevo2]  = useState("");
+  const [cambiarPinMsg,setCambiarMsg] = useState({});
 
   const load = useCallback(async(key,fn,setter)=>{
     setLoading(p=>({...p,[key]:true}));
@@ -139,13 +148,41 @@ export default function App() {
 
   const handleSelFecha=(n)=>{ setSelFecha(n); if(n!==null) loadFecha(n); };
 
-  const handleLogin=()=>{
-    const n=loginInput.trim(); if(!n)return;
-    localStorage.setItem("lidabox_nombre",n);
-    setMyName(n); setShowLogin(false);
-    loadFoto(n);
+  const handleLogin=async()=>{
+    const n=loginInput.trim();
+    const p=pinLoginInput.trim();
+    if(!n||!p){ setLoginError("Completá nombre y PIN"); return; }
+    // Admin bypass
+    if(n.toLowerCase()==="lucho rolando"){
+      const r = await adminLogin(n, p);
+      if(r.admin){
+        localStorage.setItem("lidabox_nombre",n);
+        setMyName(n); setShowLogin(false); setLoginError(""); loadFoto(n);
+      } else { setLoginError("PIN incorrecto"); }
+      return;
+    }
+    setLoginLoad(true); setLoginError("");
+    try{
+      const r = await loginJugadora(n, p);
+      if(r.ok){
+        localStorage.setItem("lidabox_nombre", r.nombre);
+        setMyName(r.nombre); setShowLogin(false); loadFoto(r.nombre);
+      } else { setLoginError(r.error||"Error al ingresar"); }
+    }catch(e){ setLoginError("Error de conexión"); }
+    finally{ setLoginLoad(false); }
   };
-  const handleLogout=()=>{ localStorage.removeItem("lidabox_nombre"); setMyName(""); setShowLogin(true); setIsAdmin(false); };
+  const handleLogout=()=>{ localStorage.removeItem("lidabox_nombre"); setMyName(""); setShowLogin(true); setIsAdmin(false); setPinLogin(""); setLoginInput(""); setLoginError(""); };
+
+  const handleCambiarPin=async()=>{
+    if(!pinNuevo||!pinNuevo2||!pinActual){ setCambiarMsg({error:"Completá todos los campos"}); return; }
+    if(pinNuevo!==pinNuevo2){ setCambiarMsg({error:"Los PINs nuevos no coinciden"}); return; }
+    if(pinNuevo.length<4){ setCambiarMsg({error:"El PIN debe tener al menos 4 caracteres"}); return; }
+    try{
+      const r = await cambiarPin(myName, pinActual, pinNuevo);
+      if(r.ok){ setCambiarMsg({ok:"✅ PIN actualizado correctamente"}); setPinActual(""); setPinNuevo(""); setPinNuevo2(""); setTimeout(()=>{ setShowCambiarPin(false); setCambiarMsg({}); },2000); }
+      else { setCambiarMsg({error:r.error||"Error"}); }
+    }catch(e){ setCambiarMsg({error:"Error de conexión"}); }
+  };
 
   const handleToggleInsc=async()=>{
     if(!myName)return;
@@ -352,9 +389,14 @@ export default function App() {
         </div>
 
         {isMe&&(
-          <button onClick={handleLogout} style={{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.35)",fontSize:11,fontWeight:700,padding:10,borderRadius:12,cursor:"pointer",letterSpacing:1,textTransform:"uppercase"}}>
-            Cerrar sesión
-          </button>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setShowCambiarPin(true)} style={{flex:1,background:"rgba(232,79,160,0.1)",border:"1px solid rgba(232,79,160,0.3)",color:"#f9a8d4",fontSize:11,fontWeight:700,padding:10,borderRadius:12,cursor:"pointer",letterSpacing:1,textTransform:"uppercase"}}>
+              🔒 Cambiar PIN
+            </button>
+            <button onClick={handleLogout} style={{flex:1,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",color:"rgba(255,255,255,0.35)",fontSize:11,fontWeight:700,padding:10,borderRadius:12,cursor:"pointer",letterSpacing:1,textTransform:"uppercase"}}>
+              Salir
+            </button>
+          </div>
         )}
       </div>
     );
@@ -371,19 +413,75 @@ export default function App() {
         <div style={{fontSize:13,letterSpacing:4,color:"#f472b6",fontWeight:700,marginTop:2}}>LIGA DE DAMAS</div>
       </div>
       <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(232,79,160,0.3)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:360}}>
-        <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.65)",marginBottom:16,textAlign:"center"}}>Ingresá tu nombre para continuar</div>
+        <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.65)",marginBottom:18,textAlign:"center"}}>Ingresá tus datos para continuar</div>
+
+        {/* Nombre */}
+        <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",marginBottom:6}}>Tu nombre</div>
         <div style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,display:"flex",alignItems:"center",gap:8,padding:"10px 14px",marginBottom:12}}>
           <span style={{opacity:0.5}}>👤</span>
-          <input value={loginInput} onChange={e=>setLoginInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="Ej: Lore Garay" style={{background:"none",border:"none",outline:"none",color:"white",fontSize:14,flex:1,fontFamily:"'Trebuchet MS',sans-serif"}}/>
+          <input value={loginInput} onChange={e=>{setLoginInput(e.target.value);setLoginError("");}}
+            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+            placeholder="Ej: Lore Garay"
+            style={{background:"none",border:"none",outline:"none",color:"white",fontSize:14,flex:1,fontFamily:"'Trebuchet MS',sans-serif"}}/>
         </div>
-        <button onClick={handleLogin} disabled={!loginInput.trim()} style={{width:"100%",background:loginInput.trim()?"linear-gradient(135deg,#e84fa0,#b06fc4)":"rgba(255,255,255,0.07)",border:"none",borderRadius:12,padding:14,color:"white",fontSize:13,fontWeight:700,letterSpacing:1,textTransform:"uppercase",cursor:loginInput.trim()?"pointer":"not-allowed"}}>Entrar →</button>
-        <div style={{fontSize:10,color:"rgba(255,255,255,0.25)",textAlign:"center",marginTop:12,lineHeight:1.6}}>Tu nombre se guarda en tu dispositivo.<br/>Solo vos ves tu perfil personalizado.</div>
+
+        {/* PIN */}
+        <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",marginBottom:6}}>Tu PIN</div>
+        <div style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,display:"flex",alignItems:"center",gap:8,padding:"10px 14px",marginBottom:16}}>
+          <span style={{opacity:0.5}}>🔒</span>
+          <input value={pinLoginInput} onChange={e=>{setPinLogin(e.target.value);setLoginError("");}}
+            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+            type="password" placeholder="Tu PIN personal"
+            style={{background:"none",border:"none",outline:"none",color:"white",fontSize:14,flex:1,letterSpacing:4,fontFamily:"'Trebuchet MS',sans-serif"}}/>
+        </div>
+
+        {/* Error */}
+        {loginError&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#fca5a5",textAlign:"center"}}>{loginError}</div>}
+
+        <button onClick={handleLogin} disabled={loginLoading||!loginInput.trim()||!pinLoginInput.trim()} style={{
+          width:"100%",
+          background:loginInput.trim()&&pinLoginInput.trim()?"linear-gradient(135deg,#e84fa0,#b06fc4)":"rgba(255,255,255,0.07)",
+          border:"none",borderRadius:12,padding:14,color:"white",fontSize:13,fontWeight:700,
+          letterSpacing:1,textTransform:"uppercase",
+          cursor:loginLoading||!loginInput.trim()||!pinLoginInput.trim()?"not-allowed":"pointer",
+          opacity:loginLoading?0.7:1}}>
+          {loginLoading?"Verificando...":"Entrar →"}
+        </button>
+        <div style={{fontSize:10,color:"rgba(255,255,255,0.25)",textAlign:"center",marginTop:12,lineHeight:1.6}}>
+          Tu PIN te lo asignó el administrador.<br/>Podés cambiarlo desde tu perfil.
+        </div>
       </div>
     </div>
   );
 
-  // ── PIN MODAL ─────────────────────────────────────────────
-  if(showPinModal) return (
+  // ── MODAL CAMBIAR PIN ─────────────────────────────────────
+  if(showCambiarPin) return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:24}}>
+      <div style={{background:"linear-gradient(135deg,#1e0640,#3d1260)",border:"1px solid rgba(232,79,160,0.4)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:340}}>
+        <div style={{fontSize:16,fontWeight:900,color:"white",marginBottom:4,textAlign:"center"}}>🔒 Cambiar PIN</div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginBottom:20,textAlign:"center"}}>Elegí un PIN nuevo de al menos 4 caracteres</div>
+
+        {[["PIN actual","pinActual",pinActual,setPinActual],["PIN nuevo","pinNuevo",pinNuevo,setPinNuevo],["Repetir PIN nuevo","pinNuevo2",pinNuevo2,setPinNuevo2]].map(([label,key,val,setter])=>(
+          <div key={key} style={{marginBottom:10}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",marginBottom:5}}>{label}</div>
+            <input value={val} onChange={e=>{setter(e.target.value);setCambiarMsg({});}}
+              type="password" placeholder="••••"
+              style={{width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"10px 14px",color:"white",fontSize:14,letterSpacing:4,fontFamily:"'Trebuchet MS',sans-serif"}}/>
+          </div>
+        ))}
+
+        {cambiarPinMsg.error&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#fca5a5",textAlign:"center"}}>{cambiarPinMsg.error}</div>}
+        {cambiarPinMsg.ok&&<div style={{background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.3)",borderRadius:10,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#4ade80",textAlign:"center"}}>{cambiarPinMsg.ok}</div>}
+
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <button onClick={()=>{setShowCambiarPin(false);setPinActual("");setPinNuevo("");setPinNuevo2("");setCambiarMsg({});}}
+            style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",fontSize:12,fontWeight:700,padding:12,borderRadius:12,cursor:"pointer"}}>Cancelar</button>
+          <button onClick={handleCambiarPin}
+            style={{flex:2,background:"linear-gradient(135deg,#e84fa0,#b06fc4)",border:"none",color:"white",fontSize:12,fontWeight:700,padding:12,borderRadius:12,cursor:"pointer"}}>Guardar PIN →</button>
+        </div>
+      </div>
+    </div>
+  );
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:24}}>
       <div style={{background:"linear-gradient(135deg,#1e0640,#3d1260)",border:"1px solid rgba(232,79,160,0.4)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:340,textAlign:"center"}}>
         <div style={{fontSize:32,marginBottom:12}}>⚙️</div>
