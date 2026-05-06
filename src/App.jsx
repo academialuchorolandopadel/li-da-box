@@ -263,9 +263,10 @@ export default function App() {
     const pct=p.favor+p.contra>0?Math.round(p.favor/(p.favor+p.contra)*100):0;
     const diff=p.favor-p.contra;
     const dates=p.dates||[];
-    const fotoUrl=fotos[p.nombre];
+    // Cargar foto si no está en cache aún
+    if(fotos[p.nombre]===undefined) loadFoto(p.nombre);
+    const fotoUrl=fotos[p.nombre]||null;
     const isMe=p.nombre?.toLowerCase()===myName?.toLowerCase();
-    useEffect(()=>{ loadFoto(p.nombre); },[p.nombre]);
     return (
       <div style={{padding:"14px 12px"}}>
         {showBack&&<button onClick={onBack} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.55)",fontSize:11,fontWeight:700,padding:"6px 14px",borderRadius:100,cursor:"pointer",marginBottom:14,letterSpacing:1}}>← Volver</button>}
