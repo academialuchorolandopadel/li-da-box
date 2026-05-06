@@ -3,7 +3,7 @@
 // ============================================================
 
 export const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbzE7WwvquBsu0QBSM_g60XWRj2fyxySB_3QPK10iUU9A2b02WRiSGXIGmqWMgwIts8Q/exec";
+  "https://script.google.com/macros/s/AKfycbzdwUAUDkcgZbrGkAB9t8yNrvX9PKbdEwGkNhJC0GumgRSTVHkTzmfXOEK2nbvRpSvs/exec";
 
 async function get(action, params={}) {
   const query = new URLSearchParams({ action, ...params }).toString();
@@ -44,3 +44,8 @@ export const setInscConfig    = (abierta)      => post({ action:"setInscConfig",
 export const fetchFoto        = (nombre) => get("getFoto", { nombre });
 export const subirFoto        = (nombre, base64, mimeType) =>
   post({ action:"subirFoto", nombre, base64, mimeType });
+
+// ── Autenticación jugadoras
+export const loginJugadora    = (nombre, pin) => post({ action:"loginJugadora", nombre, pin });
+export const cambiarPin       = (nombre, pinActual, pinNuevo) => post({ action:"cambiarPin", nombre, pinActual, pinNuevo });
+export const verificarJugadora = (nombre) => get("verificarJugadora", { nombre });
